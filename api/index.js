@@ -26,7 +26,8 @@ const ReviewSchema = new mongoose.Schema({
   verified: { type: Boolean, default: false },
   created_at: { type: Date, default: Date.now }
 }, {
-  versionKey: false
+  versionKey: false,
+  collection: 'reviews' // <-- AGREGA ESTA LÍNEA AQUÍ
 });
 
 const Review = mongoose.models.Review || mongoose.model('Review', ReviewSchema);
@@ -73,6 +74,18 @@ app.post('/api/reviews', async (req, res) => {
 app.get('/api/test', async (req, res) => {
   try {
     res.status(200).json({ message: 'Test exitoso' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error test' });
+  }
+});
+
+app.get('/api/testdb', async (req, res) => {
+  try {
+    await connectDB();
+    res.status(200).json({ 
+      message: 'Test exitoso', 
+      database_name: mongoose.connection.name // Te dirá 'carters' o 'test'
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error test' });
   }
