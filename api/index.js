@@ -18,7 +18,7 @@ const connectDB = async () => {
 };
 
 const ReviewSchema = new mongoose.Schema({
-  sku: { type: String, required: true, trim: true, index: true },
+  SKU: { type: String, required: true, trim: true, index: true },
   reviewer_name: { type: String, required: true, trim: true },
   rating: { type: Number, required: true, min: 1, max: 5 },
   title: { type: String, trim: true, maxlength: 120 },
@@ -34,7 +34,7 @@ const Review = mongoose.models.Review || mongoose.model('Review', ReviewSchema);
 app.get('/api/reviews/:sku', async (req, res) => {
   try {
     await connectDB();
-    const reviews = await Review.find({ sku: req.params.sku }).sort({ created_at: -1 });
+    const reviews = await Review.find({ SKU: req.params.sku }).sort({ created_at: -1 });
     res.json(reviews);
   } catch (error) {
     res.status(500).json({ error: 'Error obteniendo reseñas' });
@@ -45,10 +45,10 @@ app.post('/api/reviews', async (req, res) => {
   try {
     await connectDB();
 
-    const { sku, reviewer_name, rating, title, body } = req.body;
+    const { SKU, reviewer_name, rating, title, body } = req.body;
 
     const newReview = new Review({
-      sku,
+      SKU,
       reviewer_name,
       rating,
       title,
