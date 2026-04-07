@@ -1,0 +1,322 @@
+<script>
+/**
+ * Widget de Reseñas de Clientes (Compatible con ES5 para GTM)
+ * Se encarga de extraer el SKU de la página, consultar la API de MongoDB (Vercel),
+ * renderizar las tarjetas de reseñas y manejar el formulario de envío (POST).
+ */
+(function () {
+  // 1. Obtener el SKU de la página
+  var skuElement = document.querySelector(".cod");
+  if (!skuElement) {
+    console.error("GTM: No se encontró el elemento con clase .cod");
+    return;
+  }
+  var currentSku = skuElement.innerText.trim().slice(0, -2);
+
+  // 2. Tu API real en Vercel
+  var apiUrl = 'https://express-vercel-delta-blush.vercel.app/api/reviews';
+
+  // 3. Consultar la API (GET)
+  fetch(apiUrl + '/' + currentSku)
+    .then(function(response) {
+      if (!response.ok) throw new Error("Error en la respuesta del servidor");
+      return response.json();
+    })
+    .then(function(dbReviews) {
+      renderizarWidget(dbReviews, currentSku);
+    })
+    .catch(function(error) {
+      console.error('GTM Error al cargar reseñas de la API:', error);
+    });
+
+  /**
+   * @typedef {Object} ReviewData
+   * @property {number} rating - Calificación de la reseña (1-5).
+   * @property {string} title - Título corto de la reseña.
+   * @property {string} body - Comentario completo.
+   * @property {string} sku - Código del producto.
+   * @property {string} created_at - Fecha de creación (Formato ISO).
+   * @property {string} [reviewer_name] - Nombre del autor (opcional).
+   */
+
+  /**
+   * Construye e inyecta el HTML del widget en el DOM basándose en los datos de la API.
+   * * @param {ReviewData[]} productReviews - Array de reseñas devueltas por la base de datos.
+   * @param {string} sku - SKU del producto actual.
+   */
+  function renderizarWidget(productReviews, sku) {
+    var isFallback = productReviews.length === 0;
+    
+    /** * @type {ReviewData[]}
+     * Array de respaldo para mostrar si el producto actual no tiene reseñas.
+     */
+    var fallbackData = [
+      { rating: 4, title: 'Buen producto', body: 'Le queda perfecto a mi sobrina, es un buen producto, lo recomiendo ampliamente.', sku: '3U468610', created_at: '2026-02-01T00:00:00Z', reviewer_name: 'Maria A.' },
+      { rating: 4, title: 'Pantalones de acuerdo', body: 'Los compré antes de leer las reseñas; pensé que los pantalones serían muy gruesos y abrigados. Resultó que no pesan nada.', sku: '3U101010', created_at: '2026-02-01T00:00:00Z', reviewer_name: 'Gloria J.' },
+      { rating: 5, title: 'Perfecto', body: 'Serán perfectos para nuestra nueva aventura. Le quedarán de maravilla. Aprender a ir al baño es un gran paso.', sku: '3H742210', created_at: '2026-02-01T00:00:00Z', reviewer_name: 'Lucila C.' },
+      { rating: 5, title: 'Sombrero adorable', body: 'Este gorro es una monada. Mi mamá me lo regaló para el bebé. Me encanta y hemos recibido muchísimos halagos.', sku: '1U502610', created_at: '2026-02-01T00:00:00Z', reviewer_name: 'Julia S.' },
+      { rating: 5, title: 'Hora de acurrucarse', body: 'Suave y con colores preciosos. El pijama perfecto para que tu pequeño duerma plácidamente.', sku: '1T276210', created_at: '2026-02-01T00:00:00Z', reviewer_name: 'Laura M.' },
+      { rating: 4, title: 'Pijama bonito', body: 'Este pijama es precioso. Ideal para los amantes de los unicornios y el rosa.', sku: '2S380110', created_at: '2026-01-31T00:00:00Z', reviewer_name: 'Ana P.' }
+    ];
+
+    /**
+     * Extrae un número determinado de reseñas al azar de un array.
+     * * @param {ReviewData[]} arr - Array original de reseñas.
+     * @param {number} num - Cantidad de reseñas aleatorias a devolver.
+     * @returns {ReviewData[]} Sub-array con las reseñas seleccionadas.
+     */
+    function getRandomReviews(arr, num) {
+      var shuffled = arr.slice(0).sort(function() { return 0.5 - Math.random() });
+      return shuffled.slice(0, num);
+    }
+
+    // Determinar qué datos renderizar (los del producto o el fallback aleatorio)
+    var displayReviews = isFallback ? getRandomReviews(fallbackData, 4) : productReviews;
+
+    // Calcular promedio (solo si hay reseñas reales)
+    var avgRating = 0;
+    if (!isFallback && displayReviews.length > 0) {
+      var sum = 0;
+      for (var i = 0; i < displayReviews.length; i++) {
+        sum += displayReviews[i].rating;
+      }
+      avgRating = (sum / displayReviews.length).toFixed(1);
+    }
+
+    /**
+     * Devuelve una representación visual de estrellas (★/☆).
+     * * @param {number|string} rating - La calificación de 1 a 5.
+     * @returns {string} Cadena de texto con los caracteres de las estrellas.
+     */
+    function getStarsHtml(rating) {
+      var r = parseInt(rating) || 0;
+      r = Math.min(Math.max(r, 0), 5);
+      var stars = '';
+      for (var k = 0; k < r; k++) stars += '★';
+      for (var j = r; j < 5; j++) stars += '☆';
+      return stars;
+    }
+
+    // Inyección de estilos CSS
+    var style = document.createElement('style');
+    style.innerHTML = "" +
+      ".gtm-review-widget-container { font-family: 'Poppins', sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 20px; box-sizing: border-box; color: #333; }\n" +
+      ".gtm-main-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; color: #000; }\n" +
+      ".gtm-empty-state-call { text-align: center; margin: 30px 0 50px 0; }\n" +
+      ".gtm-empty-state-call p { font-size: 16px; margin-bottom: 15px; color: #000; }\n" +
+      ".gtm-write-review-btn { background-color: #00A9E0; color: white; border: none; padding: 12px 30px; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }\n" +
+      ".gtm-write-review-btn:hover { background-color: #0090c0; }\n" +
+      ".gtm-other-products-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }\n" +
+      ".gtm-other-products-title { font-size: 20px; font-weight: 700; color: #000; margin: 0; }\n" +
+      ".gtm-carousel-arrows { display: flex; gap: 10px; }\n" +
+      ".gtm-arrow-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid #00A9E0; background: white; color: #000; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }\n" +
+      ".gtm-arrow-btn:hover { background: #f0f9fc; }\n" +
+      ".gtm-review-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }\n" +
+      "@media (max-width: 992px) { .gtm-review-grid { grid-template-columns: repeat(2, 1fr); } }\n" +
+      "@media (max-width: 600px) { .gtm-review-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; } .gtm-review-card { min-width: 85vw; scroll-snap-align: start; } }\n" +
+      ".gtm-review-card { background-color: #fcfcfc; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }\n" +
+      ".gtm-card-rating { color: #00A9E0; font-size: 22px; letter-spacing: 1px; margin-bottom: 5px; }\n" +
+      ".gtm-card-meta-top { display: flex; align-items: center; gap: 10px; }\n" +
+      ".gtm-card-author { font-weight: 700; font-size: 15px; color: #000; margin: 0; }\n" +
+      ".gtm-card-verified { border: 1px solid #000; border-radius: 12px; font-size: 11px; padding: 2px 8px; font-weight: 500; }\n" +
+      ".gtm-card-date { font-size: 13px; color: #888; margin-bottom: 5px; }\n" +
+      ".gtm-card-title { font-weight: 700; margin: 0; font-size: 18px; color: #000; }\n" +
+      ".gtm-card-body { font-size: 14px; line-height: 1.5; color: #333; margin: 0; flex-grow: 1; }\n" +
+      ".gtm-card-product-ref { background-color: #e6f6f9; border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 15px; margin-top: 15px; }\n" +
+      ".gtm-ref-img-placeholder { width: 40px; height: 50px; background-color: #ccc; border-radius: 4px; flex-shrink: 0; background-image: url('https://cdn-icons-png.flaticon.com/512/1173/1173130.png'); background-size: cover; background-position: center; opacity: 0.5;}\n" +
+      ".gtm-ref-text { display: flex; flex-direction: column; font-size: 13px; }\n" +
+      ".gtm-ref-label { color: #777; }\n" +
+      ".gtm-ref-name { color: #000; text-decoration: underline; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }\n" +
+      ".gtm-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 999999; justify-content: center; align-items: center; }\n" +
+      ".gtm-modal-content { background-color: white; padding: 30px; border-radius: 8px; width: 90%; max-width: 450px; position: relative; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); }\n" +
+      ".gtm-close-modal { position: absolute; top: 15px; right: 20px; font-size: 28px; cursor: pointer; color: #aaa; line-height: 1; }\n" +
+      ".gtm-close-modal:hover { color: #000; }\n" +
+      ".gtm-modal-title { font-size: 20px; font-weight: 600; margin-top: 0; margin-bottom: 20px; color: #000; text-align: center; }\n" +
+      ".gtm-form-group { margin-bottom: 15px; }\n" +
+      ".gtm-label { display: block; margin-bottom: 5px; font-size: 14px; font-weight: 600; color: #333; }\n" +
+      ".gtm-input-text, .gtm-input-textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; font-family: inherit; }\n" +
+      ".gtm-input-textarea { height: 100px; resize: vertical; }\n" +
+      ".gtm-rating-input { display: flex; flex-direction: row-reverse; justify-content: flex-end; }\n" +
+      ".gtm-rating-input input { display: none; }\n" +
+      ".gtm-rating-input label { cursor: pointer; font-size: 30px; color: #ddd; padding: 0 2px; transition: color 0.2s; }\n" +
+      ".gtm-rating-input label:before { content: '★'; }\n" +
+      ".gtm-rating-input input:checked ~ label, .gtm-rating-input label:hover, .gtm-rating-input label:hover ~ label { color: #00A9E0; }\n" +
+      ".gtm-submit-review-btn { background-color: #00A9E0; color: white; border: none; padding: 12px; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; transition: background-color 0.2s; }";
+    document.head.appendChild(style);
+
+    // Construcción del HTML
+    var html = '<h2 class="gtm-main-title">Reseñas de Clientes</h2>';
+
+    if (isFallback) {
+      html += '<div class="gtm-empty-state-call">' +
+                '<p>Sé el primero en escribir una reseña</p>' +
+                '<button class="gtm-write-review-btn" id="write-review-btn">Escribir una reseña</button>' +
+              '</div>' +
+              '<div class="gtm-other-products-header">' +
+                '<h3 class="gtm-other-products-title">Reseñas para otros productos</h3>' +
+                '<div class="gtm-carousel-arrows">' +
+                  '<button class="gtm-arrow-btn">❮</button>' +
+                  '<button class="gtm-arrow-btn">❯</button>' +
+                '</div>' +
+              '</div>';
+    } else {
+      html += '<div class="gtm-other-products-header">' +
+                '<div style="display:flex; gap:15px; align-items:center;">' +
+                  '<span style="font-size:20px; font-weight:bold;">' + avgRating + '</span>' +
+                  '<span style="font-size:14px; color:#666;">' + displayReviews.length + ' reseñas</span>' +
+                '</div>' +
+                '<button class="gtm-write-review-btn" id="write-review-btn">Escribir una reseña</button>' +
+              '</div>';
+    }
+
+    html += '<div class="gtm-review-grid">';
+
+    for (var i = 0; i < displayReviews.length; i++) {
+      var review = displayReviews[i];
+      var rRating = review.rating;
+      var rTitle = review.title;
+      var rBody = review.body;
+      var rSku = review.sku;
+      var rName = review.reviewer_name || "Cliente Verificado";
+
+      var dateObj = new Date(review.created_at);
+      var rDateStr = !isNaN(dateObj) ? dateObj.toLocaleDateString('es-UY', { year: 'numeric', month: '2-digit', day: '2-digit' }) : "Reciente";
+
+      html += '<div class="gtm-review-card">' +
+                '<div class="gtm-card-rating">' + getStarsHtml(rRating) + '</div>' +
+                '<div class="gtm-card-meta-top">' +
+                  '<span class="gtm-card-author">' + rName + '</span>' +
+                  '<span class="gtm-card-verified">Verificado</span>' +
+                '</div>' +
+                '<div class="gtm-card-date">' + rDateStr + '</div>' +
+                '<h3 class="gtm-card-title">' + rTitle + '</h3>' +
+                '<p class="gtm-card-body">' + rBody + '</p>';
+
+      if (isFallback) {
+        html += '<div class="gtm-card-product-ref">' +
+                  '<div class="gtm-ref-img-placeholder"></div>' +
+                  '<div class="gtm-ref-text">' +
+                    '<span class="gtm-ref-label">Reseña para</span>' +
+                    '<span class="gtm-ref-name">Ref. ' + rSku + '</span>' +
+                  '</div>' +
+                '</div>';
+      }
+
+      html += '</div>';
+    }
+
+    html += '</div>'; // Fin gtm-review-grid
+
+    // Añadir Modal
+    html += '<div class="gtm-modal-overlay" id="write-review-modal">' +
+              '<div class="gtm-modal-content">' +
+                '<span class="gtm-close-modal" id="close-modal">&times;</span>' +
+                '<h3 class="gtm-modal-title">Escribir una reseña</h3>' +
+                '<form id="submit-review-form">' +
+                  '<div class="gtm-form-group" style="text-align: center;">' +
+                    '<label class="gtm-label">Calificación</label>' +
+                    '<div class="gtm-rating-input">' +
+                      '<input type="radio" id="star5" name="rating" value="5" required/><label for="star5"></label>' +
+                      '<input type="radio" id="star4" name="rating" value="4" /><label for="star4"></label>' +
+                      '<input type="radio" id="star3" name="rating" value="3" /><label for="star3"></label>' +
+                      '<input type="radio" id="star2" name="rating" value="2" /><label for="star2"></label>' +
+                      '<input type="radio" id="star1" name="rating" value="1" /><label for="star1"></label>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="gtm-form-group">' +
+                    '<label class="gtm-label" for="review-name">Nombre</label>' +
+                    '<input type="text" id="review-name" class="gtm-input-text" placeholder="Ej. María" required />' +
+                  '</div>' +
+                  '<div class="gtm-form-group">' +
+                    '<label class="gtm-label" for="review-title">Título de la reseña</label>' +
+                    '<input type="text" id="review-title" class="gtm-input-text" placeholder="Resume tu experiencia" required />' +
+                  '</div>' +
+                  '<div class="gtm-form-group">' +
+                    '<label class="gtm-label" for="review-desc">¿Qué te pareció el producto?</label>' +
+                    '<textarea id="review-desc" class="gtm-input-textarea" placeholder="Cuéntanos más detalles..." required></textarea>' +
+                  '</div>' +
+                  '<button type="submit" class="gtm-submit-review-btn">Enviar reseña</button>' +
+                '</form>' +
+              '</div>' +
+            '</div>';
+
+    var container = document.createElement('div');
+    container.id = 'gtm-review-widget';
+    container.className = 'gtm-review-widget-container';
+    container.innerHTML = html;
+
+    // Inserción en el DOM
+    var relatedProductsSection = document.getElementById('blkProductosRelacionados');
+    if (relatedProductsSection) {
+      relatedProductsSection.parentNode.insertBefore(container, relatedProductsSection);
+    } else {
+      var fichaProducto = document.getElementById('fichaProducto');
+      if (fichaProducto) {
+        fichaProducto.appendChild(container);
+      } else {
+        document.body.appendChild(container);
+      }
+    }
+
+    // Eventos y Lógica de POST (Crear nueva reseña en MongoDB)
+    setTimeout(function() {
+      var writeBtn = document.getElementById('write-review-btn');
+      var modal = document.getElementById('write-review-modal');
+      var closeModal = document.getElementById('close-modal');
+      var reviewForm = document.getElementById('submit-review-form');
+
+      if (writeBtn) {
+        writeBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          modal.style.display = 'flex';
+        });
+      }
+
+      if (closeModal) {
+        closeModal.addEventListener('click', function() {
+          modal.style.display = 'none';
+        });
+      }
+
+      window.addEventListener('click', function(e) {
+        if (e.target === modal) modal.style.display = 'none';
+      });
+
+      if (reviewForm) {
+        reviewForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          var ratingEl = document.querySelector('input[name="rating"]:checked');
+          
+          var newReviewData = {
+            sku: sku,
+            rating: ratingEl ? parseInt(ratingEl.value) : 5,
+            reviewer_name: document.getElementById('review-name').value,
+            title: document.getElementById('review-title').value,
+            body: document.getElementById('review-desc').value
+          };
+
+          fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newReviewData)
+          })
+          .then(function(res) {
+            if(res.ok) {
+              alert('¡Gracias por tu reseña! Ya la hemos guardado.');
+              reviewForm.reset();
+              modal.style.display = 'none';
+            } else {
+              alert('Hubo un problema al enviar la reseña.');
+            }
+          })
+          .catch(function(err) {
+            console.error('Error enviando reseña:', err);
+            alert('Error de conexión al enviar la reseña.');
+          });
+        });
+      }
+    }, 100);
+  }
+})();
+</script>
