@@ -4,9 +4,7 @@ const cors = require('cors');
 
 const app = express();
 
-app.use(cors({
-  origin: ['https://carters.com.uy']
-}));
+app.use(cors());
 app.use(express.json());
 
 const connectDB = async () => {
