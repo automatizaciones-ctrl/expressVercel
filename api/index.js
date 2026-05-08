@@ -5,7 +5,7 @@ const cors = require('cors');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: ['https://carters.com.uy', 'https://www.carters.com.uy', 'https://cartuytest.fenicio.com.uy'] }));
 app.use(express.json());
 
 const connectDB = async () => {
