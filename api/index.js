@@ -36,7 +36,7 @@ const Review = mongoose.models.Review || mongoose.model('Review', ReviewSchema);
 app.get('/api/reviews/:sku', async (req, res) => {
   try {
     await connectDB();
-        const reviews = await Review.find({ sku: req.params.sku, rating: { $gte: 3 } }).sort({ created_at: -1 });
+        const reviews = await Review.find({ sku: req.params.sku, rating: { $gte: 4 } }).sort({ created_at: -1 });
     res.json(reviews);
   } catch (error) {
     res.status(500).json({ error: 'Error obteniendo reseñas' });
